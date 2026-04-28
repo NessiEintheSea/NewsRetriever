@@ -195,4 +195,4 @@ Currently using `claude-haiku-4-5-20251001`. To switch models, edit `ANTHROPIC_M
 |---|---|---|---|
 | `claude-haiku-4-5-20251001` | Fastest | Good | $1/$5 per 1M |
 | `claude-sonnet-4-6` | Fast | Better | $3/$15 per 1M |
-| `claude-opus-4-6` | Slower | Best | $5/$25 per 1M |
+| `claude-opus-4-6` | Slower | Best | $5/$25 per 1M |# updated
