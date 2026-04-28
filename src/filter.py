@@ -27,12 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 def _build_filter_prompt(articles: list[Article]) -> str:
-    """Build a titles-only prompt for importance scoring."""
+    """Build a title + description prompt for importance scoring."""
     lines = []
     for i, art in enumerate(articles, start=1):
-        lines.append(f"{i}. {art.title}")
+        lines.append(f"{i}. TITLE: {art.title}")
+        if art.description:
+            lines.append(f"   DESC:  {art.description}")
     return (
-        f"Score these {len(articles)} news article titles by importance:\n\n"
+        f"Score these {len(articles)} news articles by importance:\n\n"
         + "\n".join(lines)
     )
 
