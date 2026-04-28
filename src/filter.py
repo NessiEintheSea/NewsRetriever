@@ -133,8 +133,25 @@ def filter_all(
     genre_articles: dict[str, list[Article]],
     keep: int = ARTICLES_PER_GENRE,
 ) -> dict[str, list[Article]]:
-    """Filter all genres down to top `keep` articles each."""
-    return {
-        genre: filter_genre(articles, keep)
-        for genre, articles in genre_articles.items()
-    }
+    """
+    Filter all genres down to top `keep` articles each.
+    All genre filter calls run simultaneously for maximum speed.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    with ThreadPoolExecutor(max_workers=len(genre_articles)) as executor:
+        future_to_genre = {
+            executor.submit(filter_genre, articles, keep): genre
+            for genre, articles in genre_articles.items()
+        }
+        results: dict[str, list[Article]] = {}
+        for future in as_completed(future_to_genre):
+            genre = future_to_genre[future]
+            try:
+                results[genre] = future.result()
+            except Exception as exc:
+                logger.error("Filter failed for genre '%s': %s", genre, exc)
+                results[genre] = genre_articles[genre][:keep]
+
+    # Return in original genre order
+    return {genre: results.get(genre, []) for genre in genre_articles}
