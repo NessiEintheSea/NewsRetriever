@@ -39,4 +39,4 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GENRES: ${{ github.event.inputs.genres || 'japan,world,tech,ai,crypto' }}
           ARTICLES_PER_GENRE: ${{ github.event.inputs.articles_per_genre || '5' }}
-        run: python main.py
+        run: PYTHONPATH=. python main.py
