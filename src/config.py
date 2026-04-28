@@ -32,25 +32,35 @@ FEEDS: dict[str, list[str]] = {
         "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
         "https://feeds.bbci.co.uk/news/technology/rss.xml",
     ],
-    "finance": [
-        "https://feeds.reuters.com/reuters/businessNews",
-        "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
-        "https://feeds.bbci.co.uk/news/business/rss.xml",
-    ],
     "world": [
         "https://feeds.bbci.co.uk/news/world/rss.xml",
         "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
         "https://feeds.reuters.com/reuters/worldNews",
     ],
-    "science": [
-        "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
-        "https://www.sciencedaily.com/rss/all.xml",
-        "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-    ],
     "japan": [
         "https://www3.nhk.or.jp/rss/news/cat0.xml",
         "https://japantoday.com/feed",
         "https://feeds.bbci.co.uk/news/world/asia/rss.xml",
+    ],
+    "ai": [
+        "https://feeds.feedburner.com/aiweekly",
+        "https://www.artificialintelligence-news.com/feed/",
+        "https://feeds.bbci.co.uk/news/technology/rss.xml",
+    ],
+    "crypto": [
+        "https://cointelegraph.com/rss",
+        "https://coindesk.com/arc/outboundfeeds/rss/",
+        "https://decrypt.co/feed",
+    ],
+    "finance": [
+        "https://feeds.reuters.com/reuters/businessNews",
+        "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+        "https://feeds.bbci.co.uk/news/business/rss.xml",
+    ],
+    "science": [
+        "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
+        "https://www.sciencedaily.com/rss/all.xml",
+        "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
     ],
     "health": [
         "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
