@@ -2,14 +2,14 @@ name: Daily News Digest
 
 on:
   schedule:
-    # 08:00 UTC weekdays (Mon–Fri)
-    - cron: "0 8 * * 1-5"
+    # Everyday at 4AM JST
+    - cron: "0 19 * * *"
   workflow_dispatch:
     inputs:
       genres:
         description: "Comma-separated genres (e.g. tech,finance,world)"
         required: false
-        default: "tech,finance,world"
+        default: "japan,world,tech,ai,crypto"
       articles_per_genre:
         description: "Articles per genre"
         required: false
@@ -37,6 +37,6 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          GENRES: ${{ github.event.inputs.genres || 'tech,finance,world' }}
-          ARTICLES_PER_GENRE: ${{ github.event.inputs.articles_per_genre || '3' }}
+          GENRES: ${{ github.event.inputs.genres || 'japan,world,tech,ai,crypto' }}
+          ARTICLES_PER_GENRE: ${{ github.event.inputs.articles_per_genre || '5' }}
         run: python main.py
