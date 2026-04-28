@@ -49,29 +49,11 @@ def _truncate(text: str, max_chars: int) -> str:
 
 def _calculate_fetch_count(total_available: int) -> int:
     """
-    Calculate how many articles to fetch using ratio + minimum strategy.
-
+    Calculate how many articles to use after fetching all available.
     Formula: max(MIN_FETCH, total_available × FETCH_RATIO)
-
-    Statistical basis:
-    - FETCH_RATIO=0.30 gives 95-97% confidence of capturing all
-      important articles across all genre signal densities
-    - MIN_FETCH=10 ensures full coverage on quiet news days
     """
     ratio_based = int(total_available * FETCH_RATIO)
     return max(MIN_FETCH, ratio_based)
-
-
-def _count_feed_entries(feed_url: str) -> int:
-    """
-    Fetch a feed and return the total number of available entries.
-    Used to calculate the fetch count before collecting articles.
-    """
-    try:
-        parsed = feedparser.parse(feed_url)
-        return len(parsed.entries)
-    except Exception:
-        return 0
 
 
 def fetch_genre(
@@ -81,51 +63,27 @@ def fetch_genre(
     """
     Fetch articles for a genre using ratio-based sampling.
 
-    Stage 1: Count total available articles across all feeds
-    Stage 2: Calculate fetch count = max(MIN_FETCH, total × FETCH_RATIO)
-    Stage 3: Collect up to fetch_count articles
-    Stage 4: Return all fetched articles (filtering happens in filter.py)
+    Fetches all entries from all feeds in one pass, then applies
+    the ratio to determine how many to keep. This avoids the
+    double-fetch problem of counting then re-fetching.
 
     Args:
         genre: Genre key matching FEEDS config
         keep: Final number of articles wanted after filtering
-              (used only for logging context)
     """
     feeds = FEEDS.get(genre)
     if not feeds:
         logger.warning("No feeds configured for genre '%s'", genre)
         return []
 
-    # ── Stage 1: count total available ──────────────────────────────────
-    total_available = 0
-    for feed_url in feeds:
-        total_available += _count_feed_entries(feed_url)
-
-    # ── Stage 2: calculate how many to fetch ────────────────────────────
-    fetch_count = _calculate_fetch_count(total_available)
-    logger.info(
-        "Genre '%s': %d articles available → fetching %d (ratio=%.0f%%, min=%d) → keeping %d",
-        genre,
-        total_available,
-        fetch_count,
-        FETCH_RATIO * 100,
-        MIN_FETCH,
-        keep,
-    )
-
-    # ── Stage 3: collect articles ────────────────────────────────────────
+    # ── Single pass: collect all available articles ──────────────────────
     seen_urls: set[str] = set()
-    articles: list[Article] = []
+    all_articles: list[Article] = []
 
     for feed_url in feeds:
-        if len(articles) >= fetch_count:
-            break
         try:
             parsed = feedparser.parse(feed_url)
             for entry in parsed.entries:
-                if len(articles) >= fetch_count:
-                    break
-
                 url = entry.get("link", "")
                 if not url or url in seen_urls:
                     continue
@@ -142,7 +100,7 @@ def fetch_genre(
                 if not title:
                     continue
 
-                articles.append(Article(
+                all_articles.append(Article(
                     title=title,
                     description=description,
                     url=url,
@@ -151,15 +109,23 @@ def fetch_genre(
         except Exception as exc:
             logger.warning("Failed to fetch feed %s: %s", feed_url, exc)
 
+    # ── Apply ratio to determine fetch count ─────────────────────────────
+    total_available = len(all_articles)
+    fetch_count = _calculate_fetch_count(total_available)
+    articles = all_articles[:fetch_count]
+
+    logger.info(
+        "Genre '%s': %d articles available → using %d (ratio=%.0f%%, min=%d) → keeping %d",
+        genre,
+        total_available,
+        len(articles),
+        FETCH_RATIO * 100,
+        MIN_FETCH,
+        keep,
+    )
+
     if not articles:
         logger.error("No articles fetched for genre '%s'", genre)
-    else:
-        logger.info(
-            "Fetched %d articles for genre '%s' (coverage: %.0f%%)",
-            len(articles),
-            genre,
-            (len(articles) / total_available * 100) if total_available else 0,
-        )
 
     return articles
 
