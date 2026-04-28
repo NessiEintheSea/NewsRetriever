@@ -112,4 +112,3 @@ def summarize(articles: list[Article]) -> list[Article]:
         art.summary = summary if summary else art.description  # type: ignore[attr-defined]
 
     return articles
-

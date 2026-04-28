@@ -37,4 +37,3 @@ def post_to_slack(payload: dict) -> None:
         )
 
     logger.info("Slack notification sent successfully.")
-

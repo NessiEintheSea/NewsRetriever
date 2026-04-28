@@ -2,7 +2,8 @@ name: Daily News Digest
 
 on:
   schedule:
-    - cron: "0 19 * * 0-4"
+    # 08:00 UTC weekdays (Mon–Fri)
+    - cron: "0 8 * * 1-5"
   workflow_dispatch:
     inputs:
       genres:
@@ -12,7 +13,7 @@ on:
       articles_per_genre:
         description: "Articles per genre"
         required: false
-        default: "3"
+        default: "5"
 
 jobs:
   run-agent:
@@ -38,4 +39,4 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GENRES: ${{ github.event.inputs.genres || 'tech,finance,world' }}
           ARTICLES_PER_GENRE: ${{ github.event.inputs.articles_per_genre || '3' }}
-        run: PYTHONPATH=. python main.py
+        run: python main.py

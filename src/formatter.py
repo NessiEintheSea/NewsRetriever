@@ -97,4 +97,3 @@ def build_payload(
     })
 
     return {"blocks": blocks}
-
