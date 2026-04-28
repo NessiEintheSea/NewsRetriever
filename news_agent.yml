@@ -1,0 +1,42 @@
+name: Daily News Digest
+
+on:
+  schedule:
+    # 08:00 UTC weekdays (Mon–Fri)
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      genres:
+        description: "Comma-separated genres (e.g. tech,finance,world)"
+        required: false
+        default: "tech,finance,world"
+      articles_per_genre:
+        description: "Articles per genre"
+        required: false
+        default: "3"
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run news agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GENRES: ${{ github.event.inputs.genres || 'tech,finance,world' }}
+          ARTICLES_PER_GENRE: ${{ github.event.inputs.articles_per_genre || '3' }}
+        run: python main.py
