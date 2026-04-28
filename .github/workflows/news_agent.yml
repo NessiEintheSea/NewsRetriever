@@ -2,7 +2,7 @@ name: Daily News Digest
 
 on:
   schedule:
-    - cron: "0 8 * * 1-5"
+    - cron: "0 19 * * 0-4"
   workflow_dispatch:
     inputs:
       genres:
