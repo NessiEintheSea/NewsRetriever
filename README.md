@@ -1,8 +1,8 @@
 # AI News Generation Agent
 
-I built this because I was tired of paying $30-40/month for news apps that still showed me garbage I didn't care about. This pulls from RSS feeds, uses Claude to score which articles actually matter, summarises them, and drops everything into Slack before I wake up.
+I built this because I wanted to be exhausted of scrolling news feeds with lots of same news, unrelated ads, and duplicated topic. This pulls from RSS feeds, uses Claude to score which articles actually matter, summarises them, and drops everything into Slack before I wake up.
 
-Runs every morning at 4am JST. Costs about $0.00002 per run.
+Runs every morning at 4am JST. It Costs about $0.00002 per run. I've made some adjustments, so it might be slightly more expensive, but I assume it will be almost the same.
 
 ---
 
