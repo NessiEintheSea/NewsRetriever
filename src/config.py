@@ -48,9 +48,8 @@ FEEDS: dict[str, list[str]] = {
         "https://feeds.bbci.co.uk/news/business/rss.xml",
     ],
     "world": [
-        "https://feeds.bbci.co.uk/news/world/rss.xml",
-        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-        "https://feeds.reuters.com/reuters/worldNews",
+    "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     ],
     "science": [
         "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
@@ -69,6 +68,16 @@ FEEDS: dict[str, list[str]] = {
     "sports": [
         "https://feeds.bbci.co.uk/sport/rss.xml",
         "https://rss.nytimes.com/services/xml/rss/nyt/Sports.xml",
+    ],
+    "ai": [
+    "https://feeds.feedburner.com/aiweekly",
+    "https://www.artificialintelligence-news.com/feed/",
+    "https://feeds.bbci.co.uk/news/technology/rss.xml",
+    ],
+    "crypto": [
+        "https://cointelegraph.com/rss",
+        "https://coindesk.com/arc/outboundfeeds/rss/",
+        "https://decrypt.co/feed",
     ],
 }
 
