@@ -13,7 +13,7 @@ import html
 import re
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import feedparser
 import requests
@@ -25,19 +25,15 @@ from src.config import (
     MIN_FETCH,
     FETCH_RATIO,
 )
+from src.models import Article  # re-exported for backwards compatibility
+from src.normalize import normalize_url, normalize_text, normalize_title
+from src.dedup import fingerprint as _fingerprint, content_hash as _content_hash
+from src.digest import source_name_from_url
 
 logger = logging.getLogger(__name__)
 
 FEED_TIMEOUT_SECONDS = 10
 MAX_WORKERS = 5
-
-
-@dataclass
-class Article:
-    title: str
-    description: str
-    url: str
-    genre: str
 
 
 def _strip_html(text: str) -> str:
@@ -51,6 +47,18 @@ def _truncate(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[:max_chars].rsplit(" ", 1)[0] + "…"
+
+
+def _entry_published(entry) -> datetime | None:
+    """Extract a timezone-aware published datetime from a feed entry."""
+    for key in ("published_parsed", "updated_parsed"):
+        parsed = entry.get(key)
+        if parsed:
+            try:
+                return datetime(*parsed[:6], tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                continue
+    return None
 
 
 def _calculate_fetch_count(total_available: int) -> int:
@@ -133,10 +141,14 @@ def fetch_genre(
     for feed_url in feeds:  # iterate in original order for consistency
         entries = feed_results.get(feed_url, [])
         for entry in entries:
-            url = entry.get("link", "")
-            if not url or url in seen_urls:
+            raw_url = entry.get("link", "")
+            if not raw_url:
                 continue
-            seen_urls.add(url)
+            # Normalise the URL so tracking params / trailing slashes collapse.
+            canonical_url = normalize_url(raw_url)
+            if canonical_url in seen_urls:
+                continue
+            seen_urls.add(canonical_url)
 
             title = _strip_html(entry.get("title", "")).strip()
             raw_desc = (
@@ -149,11 +161,20 @@ def fetch_genre(
             if not title:
                 continue
 
+            published_at = _entry_published(entry)
             all_articles.append(Article(
                 title=title,
                 description=description,
-                url=url,
+                url=canonical_url,
                 genre=genre,
+                guid=str(entry.get("id") or entry.get("guid") or ""),
+                canonical_url=canonical_url,
+                normalized_title=normalize_title(title),
+                source_name=source_name_from_url(canonical_url),
+                published_at=published_at,
+                content_hash=_content_hash(description),
+                fingerprint=_fingerprint(title, description),
+                language=normalize_text(entry.get("language", "") or ""),
             ))
 
     # ── Apply ratio ───────────────────────────────────────────────────────

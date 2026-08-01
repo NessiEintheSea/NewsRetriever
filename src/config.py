@@ -82,7 +82,16 @@ FEEDS: dict[str, list[str]] = {
 }
 
 # ---------------------------------------------------------------------------
-# Slack
+# Delivery / notifier
+# ---------------------------------------------------------------------------
+# Which channel to deliver to: "discord" (default) or "slack".
+NOTIFIER: str = os.getenv("NOTIFIER", "discord").strip().lower()
+
+# Discord Incoming Webhook (used when NOTIFIER=discord)
+DISCORD_WEBHOOK_URL: str = os.getenv("DISCORD_WEBHOOK_URL", "")
+
+# ---------------------------------------------------------------------------
+# Slack (used when NOTIFIER=slack; kept for backwards compatibility)
 # ---------------------------------------------------------------------------
 SLACK_WEBHOOK_URL: str = os.getenv("SLACK_WEBHOOK_URL", "")
 
@@ -90,6 +99,65 @@ SLACK_WEBHOOK_URL: str = os.getenv("SLACK_WEBHOOK_URL", "")
 # Anthropic
 # ---------------------------------------------------------------------------
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+# Model may be overridden; defaults to the existing cost-optimised Haiku.
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", ANTHROPIC_MODEL)
+
+
+# ---------------------------------------------------------------------------
+# Embeddings (Anthropic has no embedding API)
+# ---------------------------------------------------------------------------
+# "local"  = dependency-free lexical embedder (default)
+# "openai" = real semantic embeddings (better clustering; needs OPENAI_API_KEY)
+EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "local").strip().lower()
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_EMBEDDING_MODEL: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+
+
+# ---------------------------------------------------------------------------
+# Full-text extraction (improves summary / diff quality)
+# ---------------------------------------------------------------------------
+FETCH_FULL_TEXT: bool = os.getenv("FETCH_FULL_TEXT", "false").lower() in ("1", "true", "yes")
+FULL_TEXT_MAX_CHARS: int = int(os.getenv("FULL_TEXT_MAX_CHARS", "4000"))
+FULL_TEXT_TIMEOUT: int = int(os.getenv("FULL_TEXT_TIMEOUT", "10"))
+
+
+# ---------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------
+DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///data/news.db")
+
+
+# ---------------------------------------------------------------------------
+# Story / similarity / update behaviour
+# ---------------------------------------------------------------------------
+DELIVER_MINOR_UPDATES: bool = os.getenv("DELIVER_MINOR_UPDATES", "false").lower() in (
+    "1", "true", "yes",
+)
+STORY_LOOKBACK_DAYS: int = int(os.getenv("STORY_LOOKBACK_DAYS", "30"))
+SIMILARITY_THRESHOLD: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.82"))
+SIMILARITY_CANDIDATE_LIMIT: int = int(os.getenv("SIMILARITY_CANDIDATE_LIMIT", "10"))
+
+
+# ---------------------------------------------------------------------------
+# Digest volume & diversity
+# ---------------------------------------------------------------------------
+DIGEST_MAX_ITEMS: int = int(os.getenv("DIGEST_MAX_ITEMS", "7"))
+MAX_ITEMS_PER_SOURCE: int = int(os.getenv("MAX_ITEMS_PER_SOURCE", "2"))
+MAX_ITEMS_PER_CATEGORY: int = int(os.getenv("MAX_ITEMS_PER_CATEGORY", "2"))
+MAX_UPDATE_ITEMS: int = int(os.getenv("MAX_UPDATE_ITEMS", "3"))
+REQUIRE_PRIMARY_SOURCE: bool = os.getenv("REQUIRE_PRIMARY_SOURCE", "true").lower() in (
+    "1", "true", "yes",
+)
+
+
+# ---------------------------------------------------------------------------
+# Ranking weights (normalised at use-time so they need not sum to exactly 1.0)
+# ---------------------------------------------------------------------------
+WEIGHT_RELEVANCE: float = float(os.getenv("WEIGHT_RELEVANCE", "0.30"))
+WEIGHT_NOVELTY: float = float(os.getenv("WEIGHT_NOVELTY", "0.25"))
+WEIGHT_IMPORTANCE: float = float(os.getenv("WEIGHT_IMPORTANCE", "0.20"))
+WEIGHT_SOURCE_QUALITY: float = float(os.getenv("WEIGHT_SOURCE_QUALITY", "0.15"))
+WEIGHT_RECENCY: float = float(os.getenv("WEIGHT_RECENCY", "0.10"))
 
 # ---------------------------------------------------------------------------
 # Summariser prompt
@@ -116,12 +184,20 @@ Respond ONLY with a JSON array of objects in this exact format:
 No explanation. No preamble. Just the JSON array.\
 """
 
-def validate() -> None:
-    """Raise early if required secrets are missing."""
+def validate(require_notifier: bool = True) -> None:
+    """Raise early if required secrets are missing.
+
+    Args:
+        require_notifier: whether a delivery webhook is needed (False for the
+            ingest-only job, which never posts anywhere).
+    """
     missing = []
     if not ANTHROPIC_API_KEY:
         missing.append("ANTHROPIC_API_KEY")
-    if not SLACK_WEBHOOK_URL:
-        missing.append("SLACK_WEBHOOK_URL")
+    if require_notifier:
+        if NOTIFIER == "discord" and not DISCORD_WEBHOOK_URL:
+            missing.append("DISCORD_WEBHOOK_URL")
+        elif NOTIFIER == "slack" and not SLACK_WEBHOOK_URL:
+            missing.append("SLACK_WEBHOOK_URL")
     if missing:
         raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
