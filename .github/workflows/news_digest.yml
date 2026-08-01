@@ -3,9 +3,9 @@ name: Daily News Digest
 # Rank + diversify + summarise + deliver to Discord/Slack.
 on:
   schedule:
-    # 04:00 JST = 19:00 UTC. Cron in GitHub Actions is always UTC:
+    # 07:00 JST = 22:00 UTC. Cron in GitHub Actions is always UTC:
     # JST = UTC+9, so subtract 9 hours from the JST time you want.
-    - cron: "0 19 * * *"
+    - cron: "0 22 * * *"
   workflow_dispatch:
 
 concurrency:
