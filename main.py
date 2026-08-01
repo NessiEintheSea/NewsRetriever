@@ -1,98 +1,109 @@
 """
 News Agent — main entrypoint.
 
-Pipeline:
-  1. Validate config / secrets
-  2. Fetch RSS articles per genre
-  3. Summarise all articles in a single Claude Haiku call
-  4. Format as Slack Block Kit payload
-  5. POST to Slack webhook
+Two jobs (see README):
 
-Usage:
-  python main.py
-  GENRES=tech,science python main.py
-  ARTICLES_PER_GENRE=5 python main.py
+    python main.py ingest    # fetch → dedup → embed → story linking → persist
+    python main.py digest    # rank → diversify → summarise → deliver → record
+    python main.py run       # ingest then digest (default; good for local runs)
+
+Environment overrides: GENRES, ARTICLES_PER_GENRE, NOTIFIER, ... (see .env.example)
 """
 from __future__ import annotations
 
 import logging
 import sys
+import time
 
-from src.config import validate, GENRES, ARTICLES_PER_GENRE, MIN_FETCH, FETCH_RATIO
-from src.fetcher import fetch_all
-from src.filter import filter_all
-from src.summarizer import summarize
-from src.formatter import build_payload
-from src.notifier import post_to_slack
+# Load .env before importing config (config reads env vars at import time).
+from src.envfile import load_dotenv
+
+load_dotenv()
+
+from src import config
+from src.db import Database
+from src.embedding import get_embedder
+from src.llm import LLMClient, Metrics
+from src.notifiers import get_notifier
+from src.pipeline import run_ingest, run_digest
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("news_agent")
 
 
-def run() -> None:
-    # ------------------------------------------------------------------ #
-    # 0. Validate secrets up front
-    # ------------------------------------------------------------------ #
+def _build_context():
+    db = Database.connect(config.DATABASE_URL)
+    embedder = get_embedder(config)
+    metrics = Metrics()
+    llm = LLMClient(
+        api_key=config.ANTHROPIC_API_KEY,
+        model=config.ANTHROPIC_MODEL,
+        metrics=metrics,
+    )
+    return db, embedder, llm, metrics
+
+
+def cmd_ingest() -> None:
+    config.validate(require_notifier=False)
+    db, embedder, llm, metrics = _build_context()
+    start = time.time()
+    run_ingest(db, embedder, llm, metrics=metrics)
+    logger.info("API usage: %s  |  elapsed=%.1fs", metrics.as_dict(), time.time() - start)
+    db.close()
+
+
+def cmd_digest() -> None:
+    config.validate(require_notifier=True)
+    db, embedder, llm, metrics = _build_context()
+    notifier = get_notifier()
+    start = time.time()
     try:
-        validate()
+        run_digest(db, embedder, llm, notifier, channel_name=config.NOTIFIER, metrics=metrics)
+    except RuntimeError as exc:
+        logger.error("%s", exc)
+        logger.info("API usage: %s  |  elapsed=%.1fs", metrics.as_dict(), time.time() - start)
+        db.close()
+        sys.exit(1)
+    logger.info("API usage: %s  |  elapsed=%.1fs", metrics.as_dict(), time.time() - start)
+    db.close()
+
+
+def cmd_run() -> None:
+    """Ingest then digest in a single process (local / all-in-one use)."""
+    config.validate(require_notifier=True)
+    db, embedder, llm, metrics = _build_context()
+    notifier = get_notifier()
+    start = time.time()
+    run_ingest(db, embedder, llm, metrics=metrics)
+    try:
+        run_digest(db, embedder, llm, notifier, channel_name=config.NOTIFIER, metrics=metrics)
+    except RuntimeError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    finally:
+        logger.info("API usage: %s  |  elapsed=%.1fs", metrics.as_dict(), time.time() - start)
+        db.close()
+
+
+_COMMANDS = {"ingest": cmd_ingest, "digest": cmd_digest, "run": cmd_run}
+
+
+def main() -> None:
+    command = sys.argv[1] if len(sys.argv) > 1 else "run"
+    handler = _COMMANDS.get(command)
+    if handler is None:
+        logger.error("Unknown command '%s'. Use one of: %s", command, ", ".join(_COMMANDS))
+        sys.exit(2)
+    try:
+        handler()
     except EnvironmentError as exc:
         logger.error("Configuration error: %s", exc)
         sys.exit(1)
 
-    logger.info(
-        "Starting news agent  |  genres=%s  |  keep=%d  |  min_fetch=%d  |  ratio=%.0f%%",
-        GENRES,
-        ARTICLES_PER_GENRE,
-        MIN_FETCH,
-        FETCH_RATIO * 100,
-    )
-
-    # ------------------------------------------------------------------ #
-    # 1. Fetch (ratio-based sampling)
-    # ------------------------------------------------------------------ #
-    genre_articles = fetch_all(GENRES, ARTICLES_PER_GENRE)
-
-    total_fetched = sum(len(arts) for arts in genre_articles.values())
-    if total_fetched == 0:
-        logger.error("No articles fetched across all genres. Aborting.")
-        sys.exit(1)
-
-    logger.info("Total articles fetched across all genres: %d", total_fetched)
-
-    # ------------------------------------------------------------------ #
-    # 2. Filter (Claude scores by importance, keeps top N per genre)
-    # ------------------------------------------------------------------ #
-    genre_articles = filter_all(genre_articles, ARTICLES_PER_GENRE)
-
-    total_kept = sum(len(arts) for arts in genre_articles.values())
-    logger.info("Total articles after filtering: %d", total_kept)
-
-    # ------------------------------------------------------------------ #
-    # 3. Summarise (single API call for all kept articles)
-    # ------------------------------------------------------------------ #
-    all_articles = [art for arts in genre_articles.values() for art in arts]
-    summarize(all_articles)
-
-    # ------------------------------------------------------------------ #
-    # 4. Format
-    # ------------------------------------------------------------------ #
-    payload = build_payload(genre_articles)
-
-    # ------------------------------------------------------------------ #
-    # 5. Notify
-    # ------------------------------------------------------------------ #
-    try:
-        post_to_slack(payload)
-    except RuntimeError as exc:
-        logger.error("Failed to send Slack notification: %s", exc)
-        sys.exit(1)
-
-    logger.info("Done.")
-
 
 if __name__ == "__main__":
-    run()
+    main()
