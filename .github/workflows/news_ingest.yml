@@ -1,8 +1,10 @@
-name: News Agent (manual all-in-one)
+name: News Ingestion
 
-# Runs ingest + digest in one job. Handy for a manual test run.
-# Scheduled operation uses news_ingest.yml + news_digest.yml instead.
+# Fetch + dedup + embed + story linking. Runs often; never delivers.
 on:
+  schedule:
+    # Every 3 hours (UTC). Cron in GitHub Actions is always UTC.
+    - cron: "0 */3 * * *"
   workflow_dispatch:
     inputs:
       genres:
@@ -11,11 +13,12 @@ on:
         default: "japan,world,tech,ai,crypto"
 
 concurrency:
+  # Never let ingest and digest touch the DB cache at the same time.
   group: news-db
   cancel-in-progress: false
 
 jobs:
-  run-agent:
+  ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -29,6 +32,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Restore the SQLite DB from the most recent run (best-effort).
       - name: Restore news DB
         uses: actions/cache@v4
         with:
@@ -37,16 +41,14 @@ jobs:
           restore-keys: |
             news-db-
 
-      - name: Run agent (ingest + digest)
+      - name: Run ingestion
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001' }}
           DATABASE_URL: "sqlite:///data/news.db"
-          NOTIFIER: ${{ vars.NOTIFIER || 'discord' }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GENRES: ${{ github.event.inputs.genres || 'japan,world,tech,ai,crypto' }}
+          # Optional quality upgrades (see README):
           EMBEDDING_PROVIDER: ${{ vars.EMBEDDING_PROVIDER || 'local' }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           FETCH_FULL_TEXT: ${{ vars.FETCH_FULL_TEXT || 'false' }}
-        run: PYTHONPATH=. python main.py run
+        run: PYTHONPATH=. python main.py ingest

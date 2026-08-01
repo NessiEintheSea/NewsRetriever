@@ -1,21 +1,19 @@
-name: News Agent (manual all-in-one)
+name: Daily News Digest
 
-# Runs ingest + digest in one job. Handy for a manual test run.
-# Scheduled operation uses news_ingest.yml + news_digest.yml instead.
+# Rank + diversify + summarise + deliver to Discord/Slack.
 on:
+  schedule:
+    # 04:00 JST = 19:00 UTC. Cron in GitHub Actions is always UTC:
+    # JST = UTC+9, so subtract 9 hours from the JST time you want.
+    - cron: "0 19 * * *"
   workflow_dispatch:
-    inputs:
-      genres:
-        description: "Comma-separated genres"
-        required: false
-        default: "japan,world,tech,ai,crypto"
 
 concurrency:
   group: news-db
   cancel-in-progress: false
 
 jobs:
-  run-agent:
+  digest:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -37,7 +35,7 @@ jobs:
           restore-keys: |
             news-db-
 
-      - name: Run agent (ingest + digest)
+      - name: Run digest
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001' }}
@@ -45,8 +43,5 @@ jobs:
           NOTIFIER: ${{ vars.NOTIFIER || 'discord' }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          GENRES: ${{ github.event.inputs.genres || 'japan,world,tech,ai,crypto' }}
-          EMBEDDING_PROVIDER: ${{ vars.EMBEDDING_PROVIDER || 'local' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          FETCH_FULL_TEXT: ${{ vars.FETCH_FULL_TEXT || 'false' }}
-        run: PYTHONPATH=. python main.py run
+          DELIVER_MINOR_UPDATES: ${{ vars.DELIVER_MINOR_UPDATES || 'false' }}
+        run: PYTHONPATH=. python main.py digest
